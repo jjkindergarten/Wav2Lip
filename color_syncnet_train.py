@@ -148,7 +148,8 @@ logloss = nn.BCELoss()
 def cosine_loss(a, v, y):
     d = nn.functional.cosine_similarity(a, v)
     loss = logloss(d.unsqueeze(1), y)
-
+    for d_i, y_i in zip(d, y):
+        print('Simialrity: {}, Label: {}'.format(d_i, y_i.detach().cpu().numpy()))
     return loss
 
 def train(device, model, train_data_loader, test_data_loader, optimizer,
@@ -179,13 +180,18 @@ def train(device, model, train_data_loader, test_data_loader, optimizer,
             loss.backward()
             optimizer.step()
 
+            cos_sim = nn.functional.cosine_similarity(a_norm, v_norm)
+
             global_step += 1
             cur_session_steps = global_step - resumed_step
             running_loss += loss.item()
-
-            wandb.log(
-                {'trn_loss': running_loss}
-            )
+            
+            if global_step % 100 == 0:
+                wandb.log(
+                    {'trn_loss': loss.item()},
+                    {'similarity_max': cos_sim.max()},
+                    {'similarity_min': cos_sim.min()}
+                )
 
             if global_step == 1 or global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -195,7 +201,7 @@ def train(device, model, train_data_loader, test_data_loader, optimizer,
                 with torch.no_grad():
                     eval_model(test_data_loader, global_step, device, model, checkpoint_dir)
 
-            prog_bar.set_description('Loss: {}'.format(running_loss / (step + 1)))
+            prog_bar.set_description('Loss: {} at step {}'.format(running_loss / (step + 1), step))
 
         global_epoch += 1
 
