@@ -25,8 +25,12 @@ parser.add_argument("--data_root", help="Root folder of the preprocessed LRS2 da
 
 parser.add_argument('--checkpoint_dir', help='Save checkpoints to this directory', required=True, type=str)
 parser.add_argument('--checkpoint_path', help='Resumed from this checkpoint', default=None, type=str)
+parser.add_argument('--print_file', default=None, type=argparse.FileType('w'), help='Print into to this file')
 
 args = parser.parse_args()
+
+f = args.print_file
+global f
 
 
 global_step = 0
@@ -146,10 +150,11 @@ def calculaet_embedding(a, v):
 
 logloss = nn.BCELoss()
 def cosine_loss(a, v, y):
+    global f, global_step
     d = nn.functional.cosine_similarity(a, v)
     loss = logloss(d.unsqueeze(1), y)
     for d_i, y_i in zip(d, y):
-        print('Simialrity: {}, Label: {}'.format(d_i, y_i.detach().cpu().numpy()))
+        print('Simialrity: {}, Label: {}, Global_step: {}'.format(d_i, y_i.detach().cpu().numpy(), global_step), file=f)
     return loss
 
 def train(device, model, train_data_loader, test_data_loader, optimizer,
@@ -185,7 +190,7 @@ def train(device, model, train_data_loader, test_data_loader, optimizer,
             global_step += 1
             cur_session_steps = global_step - resumed_step
             running_loss += loss.item()
-            
+
             if global_step % 100 == 0:
                 wandb.log(
                     {'trn_loss': loss.item()},
@@ -278,6 +283,7 @@ def load_checkpoint(path, model, optimizer, reset_optimizer=False):
 if __name__ == "__main__":
     checkpoint_dir = args.checkpoint_dir
     checkpoint_path = args.checkpoint_path
+
 
     wandb.init()
 
