@@ -13,6 +13,8 @@ import numpy as np
 
 from glob import glob
 
+import wandb
+
 import os, random, cv2, argparse
 from hparams import hparams, get_image_list
 
@@ -166,6 +168,10 @@ def train(device, model, train_data_loader, test_data_loader, optimizer,
             cur_session_steps = global_step - resumed_step
             running_loss += loss.item()
 
+            wandb.log(
+                {'trn_loss': running_loss}
+            )
+
             if global_step == 1 or global_step % checkpoint_interval == 0:
                 save_checkpoint(
                     model, optimizer, global_step, checkpoint_dir, global_epoch)
@@ -202,6 +208,10 @@ def eval_model(test_data_loader, global_step, device, model, checkpoint_dir):
 
         averaged_loss = sum(losses) / len(losses)
         print(averaged_loss)
+
+        wandb.log(
+            {'val_loss': averaged_loss}
+        )
 
         return
 
@@ -247,6 +257,8 @@ if __name__ == "__main__":
     checkpoint_dir = args.checkpoint_dir
     checkpoint_path = args.checkpoint_path
 
+    wandb.init()
+
     if not os.path.exists(checkpoint_dir): os.mkdir(checkpoint_dir)
 
     # Dataset and Dataloader setup
@@ -261,11 +273,22 @@ if __name__ == "__main__":
         test_dataset, batch_size=hparams.syncnet_batch_size,
         num_workers=8)
 
+    for mode, loader in zip(["Training", "Validation"], [train_data_loader, test_data_loader]):
+        if not loader:
+            continue
+        print("{} Data Size: {}".format(mode, len(loader.dataset)))
+        for batch in loader:
+            for i, item in enumerate(batch):
+                print("Item: {} Shape: {} Max: {} Min: {}".format(i, item.shape, item.max(), item.min()))
+            break
+
     device = torch.device("cuda" if use_cuda else "cpu")
 
     # Model
     model = SyncNet().to(device)
     print('total trainable params {}'.format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
+
+    wandb.watch(model)
 
     optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad],
                            lr=hparams.syncnet_lr)
@@ -277,3 +300,6 @@ if __name__ == "__main__":
           checkpoint_dir=checkpoint_dir,
           checkpoint_interval=hparams.syncnet_checkpoint_interval,
           nepochs=hparams.nepochs)
+
+    torch.save(model.state_dict(), "model.h5")
+    wandb.save('model.h5')
