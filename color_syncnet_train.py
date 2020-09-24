@@ -10,6 +10,7 @@ from torch import optim
 import torch.backends.cudnn as cudnn
 from torch.utils import data as data_utils
 import numpy as np
+from torch.nn import functional as F
 
 from glob import glob
 
@@ -132,6 +133,17 @@ class Dataset(object):
 
             return x, mel, y
 
+def calculaet_embedding(a, v):
+    a_norm = F.normalize(a, p=2, dim=1)
+    v_norm = F.normalize(v, p=2, dim=1)
+    print("Item: audio embedding Shape: {} Max: {} Min: {}".format(a.shape, a.max(), a.min()))
+    print("Item: face embedding Shape: {} Max: {} Min: {}".format(v.shape, v.max(), v.min()))
+    print("Item: audio embedding norm Shape: {} Max: {} Min: {}".format(a_norm.shape, a_norm.max(), a_norm.min()))
+    print("Item: face embedding norm Shape: {} Max: {} Min: {}".format(v_norm.shape, v_norm.max(), v_norm.min()))
+    d = nn.functional.cosine_similarity(a_norm, v_norm)
+    print('Item: cosine similarity: {} Max: {}, Min: {}'.format(d.shape, d.max(), d.min()))
+
+
 logloss = nn.BCELoss()
 def cosine_loss(a, v, y):
     d = nn.functional.cosine_similarity(a, v)
@@ -157,10 +169,13 @@ def train(device, model, train_data_loader, test_data_loader, optimizer,
 
             mel = mel.to(device)
 
-            a, v = model(mel, x)
+            a, v, a_norm, v_norm = model(mel, x)
             y = y.to(device)
 
-            loss = cosine_loss(a, v, y)
+            if step < 2:
+                calculaet_embedding(a, v)
+
+            loss = cosine_loss(a_norm, v_norm, y)
             loss.backward()
             optimizer.step()
 
@@ -200,6 +215,7 @@ def eval_model(test_data_loader, global_step, device, model, checkpoint_dir):
 
             a, v = model(mel, x)
             y = y.to(device)
+
 
             loss = cosine_loss(a, v, y)
             losses.append(loss.item())
