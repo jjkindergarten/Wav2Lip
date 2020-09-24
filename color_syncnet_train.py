@@ -213,11 +213,11 @@ def eval_model(test_data_loader, global_step, device, model, checkpoint_dir):
 
             mel = mel.to(device)
 
-            a, v = model(mel, x)
+            a, v, a_norm, v_norm = model(mel, x)
             y = y.to(device)
 
 
-            loss = cosine_loss(a, v, y)
+            loss = cosine_loss(a_norm, v_norm, y)
             losses.append(loss.item())
 
             if step > eval_steps: break
