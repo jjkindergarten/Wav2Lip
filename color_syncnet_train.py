@@ -233,12 +233,17 @@ def eval_model(test_data_loader, global_step, device, model, checkpoint_dir):
 
             if step > eval_steps: break
 
+            cos_sim = nn.functional.cosine_similarity(a_norm, v_norm)
+
+            wandb.log(
+                {'val_loss': loss.item()},
+                {'similarity_max': cos_sim.max()},
+                {'similarity_min': cos_sim.min()}
+
+            )
+
         averaged_loss = sum(losses) / len(losses)
         print(averaged_loss)
-
-        wandb.log(
-            {'val_loss': averaged_loss}
-        )
 
         return
 
